@@ -1,0 +1,8 @@
+.setupButton :global(.form-control) {
+  width: auto;
+  display: inline-block;
+}
+
+.generatePasswd {
+  margin-left: 15px;
+}

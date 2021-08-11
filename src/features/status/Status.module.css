@@ -1,0 +1,5 @@
+.hostPlace, .statePlace {
+  word-wrap: break-word;
+  word-break: break-all;
+  margin: 15px;
+}
