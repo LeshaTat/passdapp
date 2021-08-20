@@ -7,6 +7,8 @@ import { selectAlgod } from "../algoclient/algoClientSlice"
 import { selectDAppState } from "../status/statusSlice"
 import { clear, optIn, setup } from "../../lib/passreq"
 
+export const iteratesCount = 1000;
+
 export interface Contract {
   appId: null | number;
   sigs: null | Sigs;
@@ -66,7 +68,6 @@ export const requestSetupContract = (passwd: string): AppThunk => async (
     algod, 
     account, 
     appId, 
-    dappState.counter,
     passwd
   )
 };

@@ -1,6 +1,7 @@
 import algosdk from "algosdk";
-import { AuthRequest, makeNote, makeSecret, makeSigs, Sigs } from "./passkit";
-import { concatUint8Arrays, decode, encode, makeHash } from "./utils";
+import { iteratesCount } from "../features/contract/contractSlice";
+import { AuthRequest, makeSigs, Sigs } from "./passkit";
+import { concatUint8Arrays, decode, encode, makeHashIterate } from "./utils";
 
 /**
  * utility function to wait on a transaction to be confirmed
@@ -75,7 +76,6 @@ export async function setup(
   algod: algosdk.Algodv2, 
   account: algosdk.Account, 
   appId: number, 
-  k: number, 
   passwd: string
 ) {
   const suggestedParams = await algod.getTransactionParams().do();
@@ -86,17 +86,17 @@ export async function setup(
     cancelSig
   } = makeSigs(account)
   const strToObj = (b: string) => decode(b)
+  const secret = makeHashIterate(passwd, iteratesCount)
   let txn = algosdk.makeApplicationNoOpTxn(
     account.addr, 
     suggestedParams, 
     appId, [
       decode(btoa("setup")),
-      makeHash(makeSecret(appId, passwd, "prepare", k)),
-      makeHash(makeSecret(appId, passwd, "confirm", k)),
-      makeHash(makeSecret(appId, passwd, "cancel", k))
+      secret,
+      algosdk.encodeUint64(iteratesCount)
     ], undefined, undefined, undefined,
     concatUint8Arrays(
-      makeNote(appId, passwd), algosdk.encodeObj({
+      secret, algosdk.encodeObj({
         address: account.addr,
         prepare: strToObj(prepareSig), 
         confirm: strToObj(confirmSig), 
@@ -117,7 +117,7 @@ export async function findCredentials(
   appId: number, 
   passwd: string
 ): Promise<{address: string, sigs: Sigs}> {
-  let notePrefix = makeNote(appId, passwd)
+  let notePrefix = makeHashIterate(passwd, iteratesCount)
   let search = await indexer.searchForTransactions()
   .applicationID(appId)
   .txType("appl")
@@ -142,8 +142,8 @@ export async function prepare(
   addr: string,
   sigs: Sigs,
   appId: number,
-  secret: string,
-  request: AuthRequest
+  secret: Uint8Array,
+  mark: string
 ) {
   const suggestedParams = await algod.getTransactionParams().do();
   let txn = algosdk.makeApplicationNoOpTxn(
@@ -151,11 +151,8 @@ export async function prepare(
     suggestedParams, 
     appId, [
       decode(btoa("prepare")),
-      decode(btoa(secret)),
-      decode(request.nsecret1),
-      decode(request.nsecret2),
-      decode(request.nsecret3),
-      decode(request.nmark)
+      secret,
+      decode(mark)
     ]
   )
   const {txId} = await algod.sendRawTransaction(
@@ -172,7 +169,7 @@ export async function makeConfirmTxn(
   algod: algosdk.Algodv2, 
   addr: string,
   appId: number,
-  secret: string,
+  secret: Uint8Array,
 ) {
   const suggestedParams = await algod.getTransactionParams().do();
   return algosdk.makeApplicationNoOpTxn(
@@ -180,7 +177,7 @@ export async function makeConfirmTxn(
     suggestedParams, 
     appId, [
       decode(btoa("confirm")),
-      decode(btoa(secret))
+      secret
     ]
   )
 }
@@ -190,7 +187,7 @@ export async function cancel(
   addr: string,
   sigs: Sigs,
   appId: number,
-  secret: string
+  secret: Uint8Array
 ) {
   const suggestedParams = await algod.getTransactionParams().do();
   let txn = algosdk.makeApplicationNoOpTxn(
@@ -198,7 +195,7 @@ export async function cancel(
     suggestedParams, 
     appId, [
       decode(btoa("cancel")),
-      decode(btoa(secret))
+      secret
     ]
   )
   const {txId} = await algod.sendRawTransaction(

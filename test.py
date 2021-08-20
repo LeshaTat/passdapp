@@ -25,17 +25,23 @@ except:
 
 lsigs = make_lsigs(a1, d)
 
+iteratesCount = 1000
+
 passwd = generateMnemonic()
 passwd = " ".join(passwd.split()[:4])
 print("\nSetup new password: "+passwd)
-setup(smart, lsigs, passwd)
+setup(smart, lsigs, passwd, iteratesCount)
+
 
 print("\nLoad credentials by password")
-lsigs = load_lsigs(smart.id, passwd)
+lsigs = load_lsigs(smart.id, passwd, iteratesCount)
 
 print("\nSend payment transaction")
 px = payTxn(a1.address, a2.address, 110000)
 byPasswd = TransactionByPasswd(smart, lsigs, passwd)
+
+send_transaction(byPasswd.gen_cancel(), wait_for_next_round=True)
+byPasswd.reload()
 
 # Generate confirmation transaction for each user
 tx_confirm = byPasswd.gen_tx_confirm()
@@ -46,13 +52,13 @@ tx_confirm.transaction.group = group_id
 px.group = group_id
 
 # Prepare password-based credentials for confirmation
-stamp = byPasswd.gen_stamp(tx_confirm)
+mark = byPasswd.gen_mark(tx_confirm)
 
 print("Send prepare")
-pxt = send_transaction(byPasswd.gen_tx_prepare(stamp))
+pxt = send_transaction(byPasswd.gen_tx_prepare(mark))
 
-# IMPORTANT! Check if credentials in ledger are correct
-if not byPasswd.check_stamp_after_prepare(stamp):
+# IMPORTANT! Check if mark in ledger is correct
+if not byPasswd.check_mark_after_prepare(mark):
   sys.exit("Contract state check failed. For security reasons you have to do setup again.")
 else:
   print("Contract state check passed.")
@@ -61,7 +67,7 @@ else:
 print("Send confirmation")
 pxt = send_transactions([
   # For every password-authenticated transaction specify a position
-  # of respective confirmation transaction.
+  # of corresponding confirmation transaction.
   # One confirmation transaction can confirm multiple transactions for one sender
   byPasswd.sign_tx(px, 1), 
   tx_confirm

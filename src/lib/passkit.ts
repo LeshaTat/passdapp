@@ -1,10 +1,9 @@
 import algosdk from "algosdk";
 import dapp from "../dapp.json"
-import { decode, encode, makeHash, makeHashBase64 } from "./utils";
+import { decode, encode, makeHashIterate } from "./utils";
 
 type PassDAppSetupState = {
-  status: "wait-setup",
-  counter: number
+  status: "wait-setup"
 }
 
 type PassDAppPrepareState = {
@@ -15,39 +14,19 @@ type PassDAppPrepareState = {
 
 type PassDAppConfirmState = {
   status: "wait-confirm",
-  nmark: string,  
+  mark: string,  
   counter: number,
-  secret: string,
-  nsecret1: string,
-  nsecret2: string,
-  nsecret3: string
+  secret: string
 }
 
 export type PassDAppState = {status: "not-created"} | {status: "not-opted-in"} | 
 PassDAppSetupState | PassDAppPrepareState | PassDAppConfirmState
 
-export type AuthRequest = {
-  nmark: string,
-  nsecret1: string,
-  nsecret2: string,
-  nsecret3: string
-}
+export type AuthRequest = string
 
-export function makeAuthRequest(appId: number, nmark: string, passwd: string, k: number) {
-  return {
-    nmark,
-    nsecret1: makeHashBase64(makeSecret(appId, passwd, "prepare", k)),
-    nsecret2: makeHashBase64(makeSecret(appId, passwd, "confirm", k)),
-    nsecret3: makeHashBase64(makeSecret(appId, passwd, "cancel", k))
-  }
-}
 
-export function checkAuthRequest(auth: AuthRequest, state: PassDAppConfirmState) {
-  let {nmark, nsecret1, nsecret2, nsecret3} = state
-  return (nmark==auth.nmark || !auth.nmark) 
-  && nsecret1==auth.nsecret1 
-  && nsecret2==auth.nsecret2
-  && nsecret3==auth.nsecret3
+export function checkAuthRequest(mark: string, state: PassDAppConfirmState) {
+  return mark==state.mark
 }
 
 export function checkPasswd(appId: number, passwd: string, state: PassDAppState): boolean {
@@ -56,15 +35,9 @@ export function checkPasswd(appId: number, passwd: string, state: PassDAppState)
     state.status==="not-opted-in" ||
     state.status==="wait-setup"
   ) return false
-  if( state.status==="wait-prepare" ) {
-    return makeHashBase64(
-      makeSecret(appId, passwd, "prepare", state.counter-1)
-    )==state.secret
-  } else {
-    return makeHashBase64(
-      makeSecret(appId, passwd, "confirm", state.counter-2)
-    )==state.secret
-  }
+  return encode(makeHashIterate(
+    passwd, state.counter
+  ))==state.secret
 }
 
 type StateValue = {
@@ -94,26 +67,22 @@ export function loadState(data: Record<string, any>, address: string, appId: num
     dict[atob(kv.key)] = kv.value
   }
   console.log(dict)
-  if( !dict.secret1.bytes && !dict.secret2.bytes && !dict.secret3.bytes ) {
+  if( !dict.secret.bytes ) {
     return {
-      status: "wait-setup",
-      counter: dict.counter.uint
+      status: "wait-setup"
     }
-  } else if( !dict.secret1.bytes ) {
+  } else if( dict.mark.bytes ) {
     return {
       status: "wait-confirm", 
-      nmark: dict.nmark.bytes, 
-      counter: dict.counter.uint,
-      secret: dict.secret2.bytes,
-      nsecret1: dict.nsecret1.bytes,
-      nsecret2: dict.nsecret2.bytes,
-      nsecret3: dict.nsecret3.bytes,
+      mark: dict.mark.bytes, 
+      secret: dict.secret.bytes,
+      counter: dict.counter.uint
     }
   } else {
     return {
       status: "wait-prepare", 
       counter: dict.counter.uint,
-      secret: dict.secret1.bytes
+      secret: dict.secret.bytes
     }
   }
 //  "bm9wZQ=="
@@ -122,16 +91,14 @@ export function loadState(data: Record<string, any>, address: string, appId: num
 
 export function getCounter(dappState: PassDAppState): number {
   if( !dappState ) return 0
-  if( dappState.status=="not-created" || dappState.status=="not-opted-in" ) return 0
+  if( 
+    dappState.status=="not-created" || 
+    dappState.status=="not-opted-in" ||
+    dappState.status=="wait-setup"
+  ) {
+    return 0
+  }
   return dappState.counter
-}
-
-export function makeNote(appId: number, passwd: string) {
-  return makeHash(passwd+"#"+appId+"#note")
-}
-
-export function makeSecret(appId: number, passwd: string, type: "confirm"|"prepare"|"cancel", k: number) {
-  return makeHashBase64(passwd+'#'+appId+'#'+k+'#'+type)
 }
 
 export function genPasswd() {
@@ -167,3 +134,4 @@ export function makeSigs(account: algosdk.Account): Sigs {
     cancelSig: encode(cancelSig.toByte())
   }
 }
+

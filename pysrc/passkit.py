@@ -1,34 +1,25 @@
 import msgpack
-from pysrc.transaction import send_transaction
 import base64
 from algosdk import constants, encoding
 from algosdk.future import transaction
 from pysrc.config import algod_client, indexer_client
 import hashlib
 
-def hash_custom(str):
-  h = hashlib.sha256(str).digest()
-  return h
-
-def secret_custom(str):
-  return hash_custom(str.encode("utf-8"))
-
-def secret_note(passwd, id):
-  return secret_custom(passwd+"#"+str(id)+"#note")
-
-def secret(passwd, id, k, step):
-#  return hashlib.sha256(2*(passwd+"#"+str(id)+"#"+str(k) + "#"+str(step)).encode("utf-8")).digest()
-  return base64.b64encode(secret_custom(passwd+"#"+str(id)+"#"+str(k)+"#"+str(step)))
-
-def hash_secret(passwd, id, k, step):
-  h = hash_custom(secret(passwd, id, k, step))
+def secret_iterate(passwd, k):
+  i = 0
+  h = passwd.encode("utf-8")
+  while i<k:
+    m = hashlib.sha256()
+    m.update(h)
+    h = m.digest()
+    i = i+1
   return h
 
 def get_bytes_txid_raw(tx):
   txn = encoding.msgpack_encode(tx)
   to_sign = constants.txid_prefix + base64.b64decode(txn)
   txid = encoding.checksum(to_sign)
-# Unlike tx.get_txid() do not execute following lines:
+# Diff vs tx.get_txid() - exclude following lines
 #  txid = base64.b32encode(txid).decode()
 #  return encoding._undo_padding(txid)
   return txid
@@ -75,23 +66,27 @@ def decodeLSigs(msg):
     "cancel": unpackLSig(obj["cancel"])
   }
 
-def load_lsigs(app_id: int, passwd: str):
-  notePrefix = secret_note(passwd, app_id)
+def load_lsigs(app_id: int, passwd: str, k: int):
   tx = indexer_client.search_transactions(
     txn_type="appl",
-    note_prefix=secret_note(passwd, app_id),
     application_id=app_id
   )
-  note = base64.b64decode(tx["transactions"][len(tx["transactions"])-1]["note"])[len(notePrefix):]
+  note_prefix = secret_iterate(passwd, k)
+  tx = indexer_client.search_transactions(
+    txn_type="appl",
+    note_prefix=note_prefix,
+    application_id=app_id
+  )
+  note = base64.b64decode(tx["transactions"][len(tx["transactions"])-1]["note"])[len(note_prefix):]
   return decodeLSigs(note)
 
-def prepare(appId, lsigs, secret, nsecret1, nsecret2, nsecret3, mark):
+def prepare(appId, lsigs, secret, mark):
   params = algod_client.suggested_params()
   params.fee = 1000
   params.flat_fee = True
   txn = transaction.ApplicationNoOpTxn(
     lsigs["address"], params, appId, 
-    ["prepare", secret, nsecret1, nsecret2, nsecret3, mark]
+    ["prepare", secret, mark]
   )
   return transaction.LogicSigTransaction(txn, lsigs["prepare"])
 
@@ -123,103 +118,58 @@ class TransactionByPasswd:
     self.lsigs = lsigs
     self.passwd = passwd
 
+  def reload(self):
+    self.smart.read_local_state()
+    self.k = loadK(self.smart)
+
   def gen_tx_confirm(self):
     return confirm(
       self.smart.id,
       self.lsigs,
-      secret(self.passwd, self.smart.id, self.k-1, "confirm")
+      secret_iterate(self.passwd, self.get_prepare_k()-2)
     )
 
-  def gen_stamp(self, confirm_tx: transaction.LogicSigTransaction):
-    return (      
-      hash_secret(self.passwd, self.smart.id, self.k, "prepare"),
-      hash_secret(self.passwd, self.smart.id, self.k, "confirm"),
-      hash_secret(self.passwd, self.smart.id, self.k, "cancel"),
-      get_bytes_txid_raw(confirm_tx.transaction)
-    )
+  def gen_mark(self, confirm_tx: transaction.LogicSigTransaction):
+    return get_bytes_txid_raw(confirm_tx.transaction)
   
-  def check_stamp_after_prepare(self, stamp):
+  def check_mark_after_prepare(self, mark):
     self.smart.read_local_state()
-    return (
-      self.smart.get_local_state_bytes("nsecret1"),
-      self.smart.get_local_state_bytes("nsecret2"),
-      self.smart.get_local_state_bytes("nsecret3"),
-      self.smart.get_local_state_bytes("nmark"),
-    ) == stamp
+    return self.smart.get_local_state_bytes("mark") == mark
 
-  def gen_tx_prepare(self, stamp):
-    (
-      hash_secret_next_prepare, 
-      hash_secret_next_confirm,
-      hash_secret_next_cancel,
-      mark
-    ) = stamp
-    hash_secret_next_cancel = hash_secret(self.passwd, self.smart.id, self.k, "cancel")
-    secret_prepare = secret(self.passwd, self.smart.id, self.k-1, "prepare")
+  def get_prepare_k(self):
+    dk = self.k%3
+    if dk==0: dk=3
+    return self.k-dk
+
+  def gen_tx_prepare(self, mark):
+    secret_prepare = secret_iterate(self.passwd, self.get_prepare_k())
     return prepare(
       self.smart.id,
       self.lsigs,
       secret_prepare, 
-      hash_secret_next_prepare, 
-      hash_secret_next_confirm,
-      hash_secret_next_cancel,
       mark
     )
+  
+  def gen_cancel(self):
+    return cancel(self.smart.id, self.lsigs, secret_iterate(self.passwd, self.k-1))
 
   def sign_tx(self, tx, confirm_pos):
     lsig = self.lsigs["confirmTxn"]
     lsig.args = [(confirm_pos).to_bytes(8, 'big')]
     return transaction.LogicSigTransaction(tx, lsig)
 
-  
-
-def transaction_by_passwd(smart, lsigs, passwd, tx):
+def sendCancel(smart, lsigs, passwd, k):
   smart.read_local_state()
   k = loadK(smart)
 
-  tx_confirm = confirm(
-    smart.id,
-    lsigs,
-    secret(passwd, smart.id, k-1, "confirm")
-  )
-
-  group_id = transaction.calculate_group_id([tx, tx_confirm.transaction])
-  tx_confirm.transaction.group = group_id
-  tx.group = group_id
-  tx_prepare = prepare(
-    smart.id,
-    lsigs,
-    secret(passwd, smart.id, k-1, "prepare"),
-    hash_secret(passwd, smart.id, k, "prepare"),
-    hash_secret(passwd, smart.id, k, "confirm"),
-    hash_secret(passwd, smart.id, k, "cancel"),
-    get_bytes_txid_raw(tx_confirm.transaction)
-  )
-  lsig = lsigs["confirmTxn"]
-  lsig.args = [(1).to_bytes(8, 'big')]
-  tx_signed = transaction.LogicSigTransaction(tx, lsig)
-  return [tx_signed, tx_prepare, tx_confirm]
-
-def sendCancel(smart, lsigs, passwd):
+def setup(smart, lsigs, passwd, k):
   smart.read_local_state()
-  k = loadK(smart)
-  cancelTxn = cancel(smart.id, lsigs, secret(passwd, smart.id, k-2, "cancel"))
-  print("cancel")
-  send_transaction(cancelTxn)
-
-#testPay()
-
-def setup(smart, lsigs, passwd):
-  smart.read_local_state()
-  k = loadK(smart)
+  secret = secret_iterate(passwd, k)
   smart.call(
     [
       "setup", 
-      hash_secret(passwd, smart.id, k, "prepare"),
-      hash_secret(passwd, smart.id, k, "confirm"),
-      hash_secret(passwd, smart.id, k, "cancel")
+      secret,
+      k.to_bytes(8, 'big')
     ],
-    secret_note(passwd, smart.id)+encodeLSigs(lsigs)
+    secret+encodeLSigs(lsigs)
   )
-
-#print(json.dumps(encoding.msgpack_decode(note), indent=2))

@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 from algosdk.future import transaction
-from pyteal import Arg, Add, Minus, TealType, If, Gt, Ge, Seq, Assert, Txn, App, Bytes, Int, Btoi, Return, And, Or, OnComplete, Cond, compileTeal, Mode, Global, Gtxn, Sha256, ScratchVar
+from pyteal import Mod, Arg, Add, Minus, TealType, If, Gt, Ge, Seq, Assert, Txn, App, Bytes, Int, Btoi, Return, And, Or, OnComplete, Cond, compileTeal, Mode, Global, Gtxn, Sha256, ScratchVar
 from .config import algod_client
 
 def approval_program():
@@ -10,65 +10,67 @@ def approval_program():
 
     register = Seq([
         App.localPut(Int(0), Bytes("counter"), Int(0)),
-        App.localPut(Int(0), Bytes("secret1"), Bytes("")),
-        App.localPut(Int(0), Bytes("secret2"), Bytes("")),
-        App.localPut(Int(0), Bytes("secret3"), Bytes("")),
+        App.localPut(Int(0), Bytes("secret"), Bytes("")),
         App.localPut(Int(0), Bytes("mark"), Bytes("")),
-        App.localPut(Int(0), Bytes("nsecret1"), Bytes("")),
-        App.localPut(Int(0), Bytes("nsecret2"), Bytes("")),
-        App.localPut(Int(0), Bytes("nsecret3"), Bytes("")),
-        App.localPut(Int(0), Bytes("nmark"), Bytes("")),
         Return(Int(1))
     ])
 
     setup = Seq([
-        Assert(Txn.application_args.length() == Int(4)),
-        App.localPut(Int(0), Bytes("secret1"), Txn.application_args[1]),
-        App.localPut(Int(0), Bytes("secret2"), Txn.application_args[2]),
-        App.localPut(Int(0), Bytes("secret3"), Txn.application_args[3]),
-        App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))+Int(1)),
+        Assert(Txn.application_args.length() == Int(3)),
+        App.localPut(Int(0), Bytes("secret"), Txn.application_args[1]),
+        App.localPut(Int(0), Bytes("counter"), Btoi(Txn.application_args[2])),
+        App.localPut(Int(0), Bytes("mark"), Bytes("")),
         Return(is_admin)
     ])
 
-#    testSecret = Return(Sha256(Txn.application_args[1])==App.localGet(Int(0), Bytes("secret1")))
-#        testSecret = Return(Txn.application_args[1]==App.localGet(Int(0), Bytes("secret1")))
-
+    hash_secret = ScratchVar(TealType.bytes)
     prepare = Seq([
-        Assert(Txn.application_args.length() == Int(6)),
-        Assert(Sha256(Txn.application_args[1])==App.localGet(Int(0), Bytes("secret1"))),
-        App.localPut(Int(0), Bytes("secret1"), Bytes("")),
-        App.localPut(Int(0), Bytes("nsecret1"), Txn.application_args[2]),
-        App.localPut(Int(0), Bytes("nsecret2"), Txn.application_args[3]),
-        App.localPut(Int(0), Bytes("nsecret3"), Txn.application_args[4]),
-        App.localPut(Int(0), Bytes("nmark"), Txn.application_args[5]),
-        App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))+Int(1)),
+        Assert(Txn.application_args.length() == Int(3)),
+        
+        # Check if app is in wait_prepare state
+        Assert(Bytes("")==App.localGet(Int(0), Bytes("mark"))),
+        
+        # After a secret is acquired counter must be equal to 3*k
+        hash_secret.store(Sha256(Txn.application_args[1])),
+        App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))-Int(1)),
+        If(
+            Mod(App.localGet(Int(0), Bytes("counter")), Int(3)) != Int(0),
+            Seq([
+                hash_secret.store(Sha256(hash_secret.load())),
+                App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))-Int(1)),
+            ])
+        ),
+        If(
+            Mod(App.localGet(Int(0), Bytes("counter")), Int(3)) != Int(0),
+            Seq([
+                hash_secret.store(Sha256(hash_secret.load())),
+                App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))-Int(1)),
+            ])
+        ),
+
+        # Assert hash^d(new secret) = secret, where d = old_counter-counter
+        Assert(hash_secret.load()==App.localGet(Int(0), Bytes("secret"))),
+        App.localPut(Int(0), Bytes("secret"), Txn.application_args[1]),
+        App.localPut(Int(0), Bytes("mark"), Txn.application_args[2]),
         Return(Int(1))
     ])
 
-#    confirm = Return(Int(1))
     confirm = Seq([
         Assert(Txn.application_args.length() == Int(2)),
-        Assert(Bytes("")==App.localGet(Int(0), Bytes("secret1"))),
-        Assert(Sha256(Txn.application_args[1])==App.localGet(Int(0), Bytes("secret2"))),
-        App.localPut(Int(0), Bytes('secret1'), App.localGet(Int(0), Bytes("nsecret1"))),
-        App.localPut(Int(0), Bytes('secret2'), App.localGet(Int(0), Bytes("nsecret2"))),
-        App.localPut(Int(0), Bytes('secret3'), App.localGet(Int(0), Bytes("nsecret3"))),
-        App.localPut(Int(0), Bytes('mark'), App.localGet(Int(0), Bytes("nmark"))),
-        If(
-            Gt(Global.group_size(), Int(1)),
-            Return(Txn.tx_id()==App.localGet(Int(0), Bytes("nmark"))),
-            Return(Int(1))
-        ),
+        Assert(Sha256(Sha256(Txn.application_args[1]))==App.localGet(Int(0), Bytes("secret"))),
+        Assert(Txn.tx_id()==App.localGet(Int(0), Bytes("mark"))),
+        App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))-Int(2)),
+        App.localPut(Int(0), Bytes("secret"), Txn.application_args[1]),
+        App.localPut(Int(0), Bytes("mark"), Bytes("")),
+        Return(Int(1))
     ])
 
     cancel = Seq([
         Assert(Txn.application_args.length() == Int(2)),
-        Assert(Bytes("")==App.localGet(Int(0), Bytes("secret1"))),
-        Assert(Sha256(Txn.application_args[1])==App.localGet(Int(0), Bytes("secret3"))),
-        App.localPut(Int(0), Bytes('secret1'), App.localGet(Int(0), Bytes("nsecret1"))),
-        App.localPut(Int(0), Bytes('secret2'), App.localGet(Int(0), Bytes("nsecret2"))),
-        App.localPut(Int(0), Bytes('secret3'), App.localGet(Int(0), Bytes("nsecret3"))),
-        App.localPut(Int(0), Bytes('mark'), Bytes("")),
+        Assert(Sha256(Txn.application_args[1])==App.localGet(Int(0), Bytes("secret"))),
+        App.localPut(Int(0), Bytes("counter"), App.localGet(Int(0), Bytes("counter"))-Int(1)),
+        App.localPut(Int(0), Bytes("secret"), Txn.application_args[1]),
+        App.localPut(Int(0), Bytes("mark"), Bytes("")),
         Return(Int(1))
     ])
 
@@ -86,7 +88,7 @@ def approval_program():
 
     return {
         "program": program,
-        "local_schema": transaction.StateSchema(1, 8),
+        "local_schema": transaction.StateSchema(1, 2),
         "global_schema": transaction.StateSchema(0, 0)
     }
 

@@ -12,12 +12,12 @@ export const decode = (chars: string) => Uint8Array.from(atob(chars), asCharCode
 
 const asCharCode = (c: string) => c.charCodeAt(0);
 
-export function makeHash(secret: string) {
-  return createHash().update(secret).digest()
-}
-
-export function makeHashBase64(secret: string) {
-  return encode(makeHash(secret))
+export function makeHashIterate(secret: string | Uint8Array, k: number) {
+  let v: Uint8Array = createHash().update(secret as any).digest()
+  for( let i=0; i<k-1; ++i ) {
+    v = createHash().update(v).digest()
+  }
+  return v
 }
 
 export function concatUint8Arrays(a1: Uint8Array, a2: Uint8Array) {

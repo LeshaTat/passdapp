@@ -3,8 +3,6 @@ import { createSelector } from "reselect"
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { AppThunk, RootState } from '../../app/store'
 import {  
-  makeAuthRequest, 
-  makeSecret,
   checkAuthRequest,
   checkPasswd
 } from '../../lib/passkit'
@@ -15,7 +13,7 @@ import { selectSigs, setSigs } from "../contract/contractSlice"
 import { makeRequest, selectDAppState } from "../status/statusSlice"
 import { appId } from "../../dapp.json"
 import { cancel, confirmCTxn, findCredentials, makeConfirmTxn, prepare } from "../../lib/passreq"
-import { encode } from "../../lib/utils"
+import { encode, makeHashIterate } from "../../lib/utils"
 
 export type RequestType = "find" | "prepare" | "confirm" | "cancel"
 
@@ -106,9 +104,12 @@ AppThunk<Promise<{groupCTxn: algosdk.Transaction, groupTxn: algosdk.Transaction}
   if( !dappState || dappState.status!="wait-prepare" ) throw "Incorrect contract local state"
   dispatch(setCurrentRequest('prepare'))
   try {
+    let kPrepare = dappState.counter - dappState.counter%3
+    let kConfirm = kPrepare - 2
+    let secretConfirm = makeHashIterate(passwd, kConfirm)
     let ctxn = await makeConfirmTxn(
       algod, address, appId, 
-      makeSecret(appId, passwd, "confirm", dappState.counter-1)
+      secretConfirm
     )
     let [groupCTxn, groupTxn] = algosdk.assignGroupID([
       ctxn,
@@ -123,8 +124,8 @@ AppThunk<Promise<{groupCTxn: algosdk.Transaction, groupTxn: algosdk.Transaction}
       address, 
       sigs, 
       appId, 
-      makeSecret(appId, passwd, "prepare", dappState.counter-1),
-      makeAuthRequest(appId, encode(groupCTxn.rawTxID()), passwd, dappState.counter)
+      makeHashIterate(secretConfirm, 2),
+      encode(groupCTxn.rawTxID())
     )
     return {groupCTxn, groupTxn}
   } finally {
@@ -142,11 +143,10 @@ export const requestConfirm = (
   const algod = selectAlgod(getState())
   const sigs = selectSigs(getState())
   const dappState = selectDAppState(getState())
-  const passwd = selectPasswd(getState())
   if( !sigs ) throw "Signatures not loaded"
   if( !dappState || dappState.status!=="wait-confirm" ) throw "Not waiting for confirmation"
   if( !checkAuthRequest(
-    makeAuthRequest(appId, encode(groupCTxn.rawTxID()), passwd, dappState.counter-1),
+    encode(groupCTxn.rawTxID()),
     dappState
   ) ) throw "State check failed: it is not safe to proceed"
 
@@ -174,10 +174,6 @@ export const requestCancel = (): AppThunk => async (
   const passwd = selectPasswd(getState())
   if( !sigs ) throw "Signatures not loaded"
   if( !dappState || dappState.status!=="wait-confirm" ) throw "Not waiting for confirmation"
-  if( !checkAuthRequest(
-    makeAuthRequest(appId, "", passwd, dappState.counter-1),
-    dappState
-  ) ) throw "State check failed: it is not safe to proceed"
   dispatch(setCurrentRequest("cancel"))
   try {
     await cancel(
@@ -185,7 +181,7 @@ export const requestCancel = (): AppThunk => async (
       address, 
       sigs, 
       appId, 
-      makeSecret(appId, passwd, "cancel", dappState.counter-2),
+      makeHashIterate(passwd, dappState.counter-1),
     )
   } finally {
     dispatch(setCurrentRequest(null))
