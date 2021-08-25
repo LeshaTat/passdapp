@@ -7,15 +7,15 @@
 
 ### PassDApp Smart Contract
 
-Local states (i.e. user-specific states):
-* counter - number that is used to specify the current OTP
-* secret - hash of the current OTP
-* mark - identifier of transaction group that is currently being confirmed
+Local states (i.e., user-specific states):
+* counter - index of the current OTP in the sequence,
+* secret - hash of the current OTP,
+* mark - identifier of the transaction group currently being confirmed.
 
-We use the principle of OTPs generation and verification borrowed from Lamport's paper [[Password Authentication with Insecure Communication](http://lamport.azurewebsites.net/pubs/password.pdf)]. It means that every OTP in a serie lies in a hash preimage of previous OTP (i.e. H(OTP_previous) = OTP_next).
+We use OTPs generation and verification principle borrowed from Lamport's paper [[Password Authentication with Insecure Communication](http://lamport.azurewebsites.net/pubs/password.pdf)]. It means that every OTP in a sequence lies in a hash pre-image of the previous OTP (i.e. H(OTP_previous) = OTP_next).
 
 
-Types of call app transaction:
+Types of the PassDApp call transactions:
 
 * ["setup", new_secret, new_counter]
 
@@ -38,11 +38,11 @@ Types of call app transaction:
   
   sets mark="", secret=OTP, counter=counter-1.
 
-PyTeal specification for contract and logic signatures can be found in file /pysrc/passdapp.py.
+You can find PyTeal specifications for contract and logic signatures in the file /pysrc/passdapp.py.
 
 ### Setup
 
-1. Generate 44-bits password randomly. User gets it as an 4-words passphrase where each word is chosen randomly from the [list](https://git.io/fhZUO) of 2048 words.
+1. Generate 44-bits password randomly. The user gets it as an 4-words passphrase where each word is chosen randomly from the [list](https://git.io/fhZUO) of 2048 words.
 
 2. Opt-in to PassDApp smart contract.
 
@@ -52,36 +52,36 @@ PyTeal specification for contract and logic signatures can be found in file /pys
 
 ## Protocol
 
-Let *tx* be a transaction. To send it to the ledger user should proceed through next steps.
+Let *tx* be a transaction. To send it to the ledger, the user should proceed through the following steps.
 
-1. Prepare group transaction (*tx*, *confirm*). 
-    Transaction *confirm* is a PassDApp call with arguments
+1. Prepare the group transaction (*tx*, *confirm*). 
+    The *confirm* transaction is a PassDApp call with arguments
 
         ["confirm", H^(k-2)(password)], 
 
-    where k is a number dividable by three nearest to the current value of local state "counter". Note that on this step nothing is sent to the ledger.
+    where k is a number dividable by three nearest to the current value of the local state "counter". Do not send that transaction to the ledger on this step.
 
 2. Send to the ledger another PassDApp call with arguments
 
         ["prepare", H^k(password), mark],
     
-    where k is the same as above and mark is the identifier of *confirm* transaction. Note that transaction *confirm* belongs to group (*tx*, *confirm*) and its identifier also identifies this whole group including *tx* transaction.
+    where k is the same as above and mark is the identifier of the *confirm* transaction. Note that the *confirm* transaction belongs to the group (*tx*, *confirm*), and its identifier also identifies this whole group, including the *tx* transaction.
 
-    The transaction is signed by prepareLSig that checks that the app id is right and the first argument is indeed the keyword "prepare" (of course, one should also check fee amount etc).
+    Sign this transaction with the *prepareLSig* that checks the app id is correct, and the first argument is indeed the keyword "prepare" (of course, one should also check fee amount, etc.).
 
-3. Check if the identifier of *confirm* is correctly stored in local state "mark" of PassDApp smart contract. If it is not then send cancel transaction (see below) and return to step 1, else proceed further.
+3. Check if the *confirm* transaction's identifier is stored in the local state "mark" of the PassDApp smart contract. If it is not, then send cancel transaction (see below) and return to step 1. If the identifier is correct, proceed further.
 
-    Send to the ledger the group (*tx*, *confirm*) where both transactions are signed by logic signatures *confirmLSig* and *confirmTxnLSig* respectively. 
+    Sign transactions in the group (*tx*, *confirm*) with *confirmLSig* and *confirmTxnLSig*, respectively. Send the group to the ledger. 
 
-    *confirmLSig* checks that there is a suitable confirmation transaction (i.e. app call with right app id and the keyword "confirm" in the first position of arguments list) in the group and that it's sender is the same as for *tx* transaction. 
+    *confirmLSig* checks a suitable confirmation transaction (i.e. app call with right app id and the keyword "confirm" in the first position of arguments list) exists in the group and it's sender is the same as for the *tx* transaction. 
     
-    *confirmTxnLSig* checks that current transaction is a suitable confirmation transaction (in the same way as explained above). 
+    *confirmTxnLSig* checks current transaction is a suitable confirmation transaction (in the same way as explained above). 
 
 Cancel transaction is a call to PassDApp transaction with arguments
    
     ["cancel", H^(k-1)(password)].
 
-It is signed by cancelLSig that checks the that an app id of transaction is correct and that the first argument is keyword "cancel".
+Sign this call transaction with cancelLSig that checks the app id is correct and the first argument is keyword "cancel".
 
 ## Build and run
 
@@ -89,9 +89,9 @@ It is signed by cancelLSig that checks the that an app id of transaction is corr
 
 This project uses *python 3.9* and *node*. Make sure you have them installed.
 
-In order to run this project you need access to working algorand node.
+To run this project, you need access to working algorand node.
 Web-app currently supports two options: sandbox or purestake. 
-Python scripts can be configured to connect to any algorand node.
+You can configure python scripts to connect to any algorand node.
 
 ### Installation
 
@@ -109,7 +109,7 @@ OR
 
 `python config_sandbox.py` 
 
-Configuration will be written in *config.yml*. Feel free to change its content if you want to use some other credentials.
+Scripts will write configuration to *config.yml*. Feel free to change its content if you want to use some other credentials.
 
 Run a test script.
 
