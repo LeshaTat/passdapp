@@ -11,7 +11,7 @@ import {
 import styles from './Contract.module.css'
 import { Button, Form } from 'react-bootstrap'
 
-import { selectAlgod } from '../algoclient/algoClientSlice'
+import { selectAlgod, selectPurestake } from '../algoclient/algoClientSlice'
 import { selectAccount } from '../account/accountSlice'
 
 import { genPasswd } from '../../lib/passkit'
@@ -48,12 +48,10 @@ function handleError(e: any) {
 }
 
 export function Contract() {
-  const sigs = useAppSelector(selectSigs)
   const dispatch = useAppDispatch()
   const algod = useAppSelector(selectAlgod)
   const account = useAppSelector(selectAccount)
-  const address = useAppSelector(selectAddress)
-  const dappState = useAppSelector(selectDAppState)
+  const purestake = useAppSelector(selectPurestake)
 
   return <Form>    
     <FuncPanel>
@@ -96,6 +94,22 @@ export function Contract() {
       }>
         Clear
       </Button>
+    </FuncPanel>
+    <FuncPanel>
+      {
+        purestake
+        ? <div>
+          You can get some algos to a newly created account on the following pages
+          <ul>
+            <li><a target="_blank" href="https://bank.testnet.algorand.network">https://bank.testnet.algorand.network</a></li>
+            <li><a target="_blank" href="https://testnet.algoexplorer.io/dispenser">https://testnet.algoexplorer.io/dispenser</a></li>
+          </ul>
+        </div>
+        : <div>
+          You can get some algos to a newly created account using Sandbox client. See the example in the 
+          article <a target="_blank" href="https://developer.algorand.org/articles/introducing-sandbox-20/">Introducing Sandbox 2.0</a>.
+        </div>
+      }
     </FuncPanel>
   </Form>
 }

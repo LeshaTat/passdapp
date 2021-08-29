@@ -29,7 +29,7 @@ function App() {
           <Status/>
         </Col>
         <Col sm={9}>
-          <Tabs defaultActiveKey="auth">
+          <Tabs defaultActiveKey="algoclient">
             <Tab eventKey="algoclient" title="Algorand Server">
               <TabBase>
                 <AlgorandClient/>

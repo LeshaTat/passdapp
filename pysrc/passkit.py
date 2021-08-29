@@ -67,17 +67,26 @@ def decodeLSigs(msg):
   }
 
 def load_lsigs(app_id: int, passwd: str, k: int):
-  tx = indexer_client.search_transactions(
-    txn_type="appl",
-    application_id=app_id
-  )
   note_prefix = secret_iterate(passwd, k)
-  tx = indexer_client.search_transactions(
+  txs = indexer_client.search_transactions(
     txn_type="appl",
     note_prefix=note_prefix,
     application_id=app_id
   )
-  note = base64.b64decode(tx["transactions"][len(tx["transactions"])-1]["note"])[len(note_prefix):]
+
+  tx_note = None
+  for tx in reversed(txs["transactions"]):
+    if "note" not in tx:
+      continue;
+    tx_note = base64.b64decode(tx["note"])
+    if tx_note.startswith(note_prefix):
+      break
+    tx_note = None
+  if tx_note is None:
+    print("Credentials not found")
+    return None
+  
+  note = tx_note[len(note_prefix):]
   return decodeLSigs(note)
 
 def prepare(appId, lsigs, secret, mark):

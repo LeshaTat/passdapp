@@ -47,9 +47,6 @@ type StateValue = {
 
 export function loadState(data: Record<string, any>, address: string, appId: number): PassDAppState {
   if( !data ) return {status: "not-created"}
-  if( !data["created-apps"] || !data["created-apps"].some((el: any)=>el.id==appId)) {
-    return {status: "not-created"}
-  }
   let apps = data["apps-local-state"]
   if( !apps ) {
     return {status: "not-opted-in"}

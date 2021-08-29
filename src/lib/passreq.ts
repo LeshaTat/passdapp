@@ -124,8 +124,23 @@ export async function findCredentials(
   .notePrefix(notePrefix).do()
   let txs = search && search.transactions
   if( !txs || txs.length==0 ) throw "Password not found"
-  let tx = txs[txs.length-1]
-  let msg: any = algosdk.decodeObj(decode(tx.note).slice(notePrefix.length))
+  let txNote
+  for( let i=txs.length-1; i>=0; --i ) {
+    let tx = txs[i]
+    if( !tx.note ) continue
+    txNote = decode(tx.note)
+    let prefix = true
+    for( let j=0; j<notePrefix.length; ++j ) {
+      if( txNote[j]!=notePrefix[j] ) {
+        prefix = false
+        break
+      }
+    }
+    if( prefix ) break
+    txNote = null
+  }
+  if( !txNote ) throw "Password not found" 
+  let msg: any = algosdk.decodeObj(txNote.slice(notePrefix.length))
   return {
     address: msg.address,
     sigs: {

@@ -31,9 +31,11 @@ export function AlgorandClient() {
       <Form.Check 
         type="checkbox" 
         checked={purestake} 
-        label="purestake"
-        onChange={(e)=>dispatch(setPurestake(e.currentTarget.checked))}
-      />
+        label="Purestake"        
+      >
+        <Form.Check.Input type="checkbox" checked={purestake} onChange={(e: any)=>dispatch(setPurestake(e.currentTarget.checked))}/>
+        <Form.Check.Label><a target="_blank" href="https://developer.purestake.io/login">Purestake</a></Form.Check.Label>
+      </Form.Check>
     </Form.Group>
 
     <Form.Group controlId="formToken">

@@ -20,7 +20,7 @@ def approval_program():
         App.localPut(Int(0), Bytes("secret"), Txn.application_args[1]),
         App.localPut(Int(0), Bytes("counter"), Btoi(Txn.application_args[2])),
         App.localPut(Int(0), Bytes("mark"), Bytes("")),
-        Return(is_admin)
+        Return(Int(1))
     ])
 
     hash_secret = ScratchVar(TealType.bytes)

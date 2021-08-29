@@ -136,8 +136,8 @@ class Smart:
     if state is None: return None
     return state["bytes"]
   def read_local_state(self):
-    sender = self.account['sender']
-    local_states = algod_client.account_info(sender.address)['apps-local-state']
+    sender_address = self.param['sender']
+    local_states = algod_client.account_info(sender_address)['apps-local-state']
     for local_state in local_states :
       if local_state["id"] == int(self.id) :
           self.local_state = local_state["key-value"]

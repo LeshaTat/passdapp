@@ -12,7 +12,7 @@ export interface AlgoClient {
 }
 
 const initialState: AlgoClient = {
-  purestake: false,
+  purestake: true,
   token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   host: 'http://localhost:4001',
   hostIndexer: 'http://localhost:8980'

@@ -65,6 +65,9 @@ export function Auth() {
   const [txn, setTxn] = useState<null | algosdk.Transaction>(null)
   const [groupTxn, setGroupTxn] = useState<null | algosdk.Transaction>(null)
   const [groupCTxn, setGroupCTxn] = useState<null | algosdk.Transaction>(null)
+  if( !groupTxn || !groupCTxn ) {
+    delete availableRequests.confirm
+  }
 
   const handleFind = useCallback(
     async () => {
@@ -86,6 +89,8 @@ export function Auth() {
         if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
         const curTxn = await dispatch(makePaymentTxn(raddr, amount))
         setTxn(curTxn)
+        setGroupCTxn(null)
+        setGroupTxn(null)
         let {groupCTxn, groupTxn} = await dispatch(makeRequest(
           requestPrepare(curTxn)
         ))
@@ -240,8 +245,8 @@ export function Auth() {
             </div>
             <div>
               {
-                groupTxn 
-                ? "Raw TxID in group: "+encode(groupTxn.rawTxID())
+                groupCTxn 
+                ? "Raw TxID in group: "+encode(groupCTxn.rawTxID())
                 : ""
               }
             </div>

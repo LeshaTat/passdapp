@@ -23,7 +23,7 @@ export interface Auth {
 }
 
 const initialState: Auth = {
-  passwd: "tilt assert mushroom useless",
+  passwd: "",
   currentRequest: null
 }
 
