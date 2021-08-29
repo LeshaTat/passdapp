@@ -8,35 +8,23 @@ from pysrc.account import Account, generateMnemonic
 from pysrc.passdapp import load_app
 from pysrc.config import developer
 
-a1 = developer
-a2 = Account("UMJZ72SRECLFFGJO3SIMW5WTZ4UGQZGARXRD3ZAOICJSIALNWC7M3RW5GQ")
-
-smart = Smart(sender = developer)
-d = load_app()
-smart.id = d["appId"]
-
-try:
-  print("Opt-in")
-  smart.opt_in()
-  print("Successfully opted-in")
-except:
-  print("Already opted-in")
-  pass
-
-lsigs = make_lsigs(a1, d)
-
 iteratesCount = 1000
 
-passwd = generateMnemonic()
-passwd = " ".join(passwd.split()[:4])
-print("\nSetup new password: "+passwd)
-setup(smart, lsigs, passwd, iteratesCount)
+if len(sys.argv)<2:
+  print("Please provide your password")
+  print('python test_pay.py "<PASSWORD>"')
+  exit(1)
 
+passwd = sys.argv[1]
+
+a2 = Account("UMJZ72SRECLFFGJO3SIMW5WTZ4UGQZGARXRD3ZAOICJSIALNWC7M3RW5GQ")
+
+d = load_app()
 
 print("\nLoad credentials by password")
-lsigs = load_lsigs(smart.id, passwd, iteratesCount)
+lsigs = load_lsigs(d["appId"], passwd, iteratesCount)
 if lsigs is None:
-  exit(1)
+  exit(1);
 
 a1 = Account(lsigs["address"])
 smart = Smart(sender = a1)
@@ -45,9 +33,6 @@ smart.id = d["appId"]
 print("\nSend payment transaction")
 px = payTxn(a1.address, a2.address, 110000)
 byPasswd = TransactionByPasswd(smart, lsigs, passwd)
-
-send_transaction(byPasswd.gen_cancel(), wait_for_next_round=True)
-byPasswd.reload()
 
 # Generate confirmation transaction for each user
 tx_confirm = byPasswd.gen_tx_confirm()
