@@ -6,8 +6,6 @@ from pyteal import Mod, Arg, Add, Minus, TealType, If, Gt, Ge, Seq, Assert, Txn,
 from .config import algod_client
 
 def approval_program():
-    is_admin = Txn.sender() == Global.creator_address()
-
     register = Seq([
         App.localPut(Int(0), Bytes("counter"), Int(0)),
         App.localPut(Int(0), Bytes("secret"), Bytes("")),
@@ -76,8 +74,8 @@ def approval_program():
 
     program = Cond(
         [Txn.application_id() == Int(0), Return(Int(1))],
-        [Txn.on_completion() == OnComplete.DeleteApplication, Return(is_admin)],
-        [Txn.on_completion() == OnComplete.UpdateApplication, Return(is_admin)],
+        [Txn.on_completion() == OnComplete.DeleteApplication, Return(Txn.sender() == Global.creator_address())],
+        [Txn.on_completion() == OnComplete.UpdateApplication, Return(Int(0))],
         [Txn.on_completion() == OnComplete.CloseOut, Return(Int(1))],
         [Txn.on_completion() == OnComplete.OptIn, register],
         [Txn.application_args[0] == Bytes("prepare"), prepare],
@@ -97,18 +95,21 @@ def clear_program():
 
 def prepare_lsig_program(appId):        
     return And(
+        Txn.fee() <= Int(1000),
         Txn.application_id() == Int(appId),
         Txn.on_completion() == OnComplete.NoOp,
         Txn.application_args[0] == Bytes("prepare")
     )
 def confirm_lsig_program(appId):
     return And(
+        Txn.fee() <= Int(1000),
         Txn.application_id() == Int(appId),
         Txn.on_completion() == OnComplete.NoOp,
         Txn.application_args[0] == Bytes("confirm")
     )
 def cancel_lsig_program(appId):
     return And(
+        Txn.fee() <= Int(1000),
         Txn.application_id() == Int(appId),
         Txn.on_completion() == OnComplete.NoOp,
         Txn.application_args[0] == Bytes("cancel")
@@ -116,6 +117,7 @@ def cancel_lsig_program(appId):
 def confirm_txn_lsig_program(appId):
     return Seq([
         Assert(Txn.rekey_to() == Global.zero_address()),
+        Assert(Txn.fee() <= Int(1000)),
         Assert(Gtxn[Btoi(Arg(0))].sender() == Txn.sender()),
         Assert(Gtxn[Btoi(Arg(0))].application_id() == Int(appId)),
         Assert(Gtxn[Btoi(Arg(0))].on_completion() == OnComplete.NoOp),

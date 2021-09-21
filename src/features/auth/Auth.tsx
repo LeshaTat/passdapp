@@ -54,7 +54,7 @@ function ButtonRequest(props: {
 export function Auth() {
   const dispatch = useAppDispatch()
   const address = useAppSelector(selectAddress)
-  const availableRequests = useAppSelector(selectAvailableRequests)
+  const availableRequests = {...useAppSelector(selectAvailableRequests)}
   const currentRequest = useAppSelector(selectCurrentRequest)
   const passwd = useAppSelector(selectPasswd)
 
@@ -168,7 +168,7 @@ export function Auth() {
           <Card>
             <Card.Header>
               <Button onClick={handleMake}>
-                Make Payment Transaction
+                Sign and Send Payment Transaction
               </Button>
             </Card.Header>
             <Card.Body>
