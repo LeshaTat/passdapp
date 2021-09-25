@@ -4,11 +4,11 @@
 
 1. Open [live demo page](https://leshatat.github.io/passdapp/).
 
-2. Fill out the form of access to an Algorand node on the *Algorand Server* tab.
+2. Fill out the form of access to an Algorand node on the *Node Provider* tab.
 
 3. Setup password on the *Setup* tab (enter your mnemonic, opt-in, generate a password, and press setup). This step is not necessary on the second and consequent runs.
 
-4. Make a sample payment transaction on the *Transaction Authentication* tab. You can either proceed through protocol step-by-step or run all the actions at once by pressing the big *Make Payment Transaction* button. Do not forget to put your password in the input form.
+4. Make a sample payment transaction on the *Transaction Authentication* tab. You can either proceed through protocol step-by-step or run all the actions at once by pressing the big *Sign and Send Payment Transaction* button. Do not forget to put your password in the input form.
 
 ## Protocol description
 
@@ -85,7 +85,7 @@ Let *tx* be a transaction. To send it to the ledger, the user should proceed thr
 
     Sign transactions in the group (*tx*, *confirm*) with *confirmLSig* and *confirmTxnLSig*, respectively. Send the group to the ledger. 
 
-    *confirmLSig* checks a suitable confirmation transaction (i.e. app call with right app id and the keyword "confirm" in the first position of arguments list) exists in the group and it's sender is the same as for the *tx* transaction. 
+    *confirmLSig* checks a suitable confirmation transaction (i.e., app call with right app id and the keyword "confirm" in the first position of arguments list) exists in the group, and its sender is the same as for the *tx* transaction. 
     
     *confirmTxnLSig* checks current transaction is a suitable confirmation transaction (in the same way as explained above). 
 
@@ -93,7 +93,7 @@ Cancel transaction is a call to PassDApp transaction with arguments
    
     ["cancel", H^(k-1)(password)].
 
-Sign this call transaction with cancelLSig that checks the app id is correct and the first argument is keyword "cancel".
+Sign this call transaction with *cancelLSig* that checks the app id is correct, and the first argument is the "cancel" keyword.
 
 ## Build
 
@@ -101,9 +101,9 @@ Sign this call transaction with cancelLSig that checks the app id is correct and
 
 This project uses *python 3.9* and *node*. Make sure you have them installed.
 
-To run this project, you need access to working algorand node.
+To run this project, you need access to an Algorand node.
 Web-app currently supports two options: sandbox or purestake. 
-You can configure python scripts to connect to any algorand node.
+You can configure python scripts to connect to any Algorand node.
 
 ### Installation
 
@@ -113,7 +113,7 @@ Setup python and node dependencies.
 
 `npm install`
 
-Make configuration file with credentials for algorand node and alogrand account (freshly generated at first run).
+Make configuration file with credentials for an Algorand node and an Alogrand account (freshly generated at first run).
    
 `python config_purestake.py <TOKEN>` 
 
