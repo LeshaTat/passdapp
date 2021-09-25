@@ -1,42 +1,54 @@
 # Password-Based Authentication for Algorand using OTPs: Proof Of Concept 
 
+## How to use the web-app
+
+1. Open [live demo page](https://leshatat.github.io/passdapp/).
+
+2. Fill out the form of access to an Algorand node on the *Algorand Server* tab.
+
+3. Setup password on the *Setup* tab (enter your mnemonic, opt-in, generate a password, and press setup). This step is not necessary on the second and consequent runs.
+
+4. Make a sample payment transaction on the *Transaction Authentication* tab. You can either proceed through protocol step-by-step or run all the actions at once by pressing the big *Make Payment Transaction* button. Do not forget to put your password in the input form.
+
+## Protocol description
+
 ### Primitives
-* H - hash function (e.g. sha256).
-* PassDApp - stateful smart contract.
-* prepareLSig, confirmLSig, confirmTxnLSig, cancelTxn - logic signatures.
+* H - a hash function (e.g. sha256).
+* PassDApp - a stateful smart contract.
+* prepareLSig, confirmLSig, confirmTxnLSig, cancelTxn - a logic signatures.
 
 ### PassDApp Smart Contract
 
 Local states (i.e., user-specific states):
-* counter - index of the current OTP in the sequence,
-* secret - hash of the current OTP,
-* mark - identifier of the transaction group currently being confirmed.
+* **counter** - the index of the current OTP in the sequence,
+* **secret** - the hash of the current OTP,
+* **mark** - the identifier of the transaction group currently being confirmed.
 
-We use OTPs generation and verification principle borrowed from Lamport's paper [[Password Authentication with Insecure Communication](http://lamport.azurewebsites.net/pubs/password.pdf)]. It means that every OTP in a sequence lies in a hash pre-image of the previous OTP (i.e. H(OTP_previous) = OTP_next).
+We use OTPs generation and verification principle borrowed from Lamport's paper [[Password Authentication with Insecure Communication](http://lamport.azurewebsites.net/pubs/password.pdf)]. It means that every OTP in a sequence lies in a hash pre-image of the previous OTP (i.e., H(OTP_previous) = OTP_next).
 
 
 Types of the PassDApp call transactions:
 
 * ["setup", new_secret, new_counter]
 
-  sets counter and secret states;
+  initializes **counter** and **secret** states;
 
 * ["prepare", OTP, new_mark]
 
-  approves if mark=="" and H^d(OTP)==secret, where d==counter modulo 3; 
+  approves if **mark**=="" and H^d(OTP)==**secret**, where d==**counter** modulo 3; 
   
-  sets mark=new_mark, secret=OTP, counter=counter-d;
+  sets **mark**=new_mark, **secret**=OTP, **counter**=**counter**-d;
 
 * ["confirm", OTP]
 
-  approves if mark==\<id of current transaction\> and H^2(OTP)==secret; 
+  approves if **mark**==\<id of current transaction\> and H^2(OTP)==**secret**; 
   
-  sets mark="", secret=OTP, counter=counter-2;
+  sets **mark**="", **secret**=OTP, **counter**=**counter**-2;
 * ["cancel", OTP]
   
   approves if H(OTP)==secret; 
   
-  sets mark="", secret=OTP, counter=counter-1.
+  sets **mark**="", **secret**=OTP, **counter**=**counter**-1.
 
 You can find PyTeal specifications for contract and logic signatures in the file /pysrc/passdapp.py.
 
@@ -50,7 +62,7 @@ You can find PyTeal specifications for contract and logic signatures in the file
 
         ["setup", H^1000(password), 1000].
 
-## Protocol
+### Authentication
 
 Let *tx* be a transaction. To send it to the ledger, the user should proceed through the following steps.
 
@@ -59,7 +71,7 @@ Let *tx* be a transaction. To send it to the ledger, the user should proceed thr
 
         ["confirm", H^(k-2)(password)], 
 
-    where k is a number dividable by three nearest to the current value of the local state "counter". Do not send that transaction to the ledger on this step.
+    where k is a number dividable by three nearest to the current value of the local state **counter**. Do not send that transaction to the ledger on this step.
 
 2. Send to the ledger another PassDApp call with arguments
 
@@ -69,7 +81,7 @@ Let *tx* be a transaction. To send it to the ledger, the user should proceed thr
 
     Sign this transaction with the *prepareLSig* that checks the app id is correct, and the first argument is indeed the keyword "prepare" (of course, one should also check fee amount, etc.).
 
-3. Check if the *confirm* transaction's identifier is stored in the local state "mark" of the PassDApp smart contract. If it is not, then send cancel transaction (see below) and return to step 1. If the identifier is correct, proceed further.
+3. Check if the *confirm* transaction's identifier is stored in the local state **mark** of the PassDApp smart contract. If it is not, then send cancel transaction (see below) and return to step 1. If the identifier is correct, proceed further.
 
     Sign transactions in the group (*tx*, *confirm*) with *confirmLSig* and *confirmTxnLSig*, respectively. Send the group to the ledger. 
 
@@ -83,7 +95,7 @@ Cancel transaction is a call to PassDApp transaction with arguments
 
 Sign this call transaction with cancelLSig that checks the app id is correct and the first argument is keyword "cancel".
 
-## Build and run
+## Build
 
 ### Pre-Requests
 
@@ -111,6 +123,10 @@ OR
 
 Scripts will write configuration to *config.yml*. Feel free to change its content if you want to use some other credentials.
 
+Create the app.
+
+`python create_app.py`
+
 Run a test script.
 
 `python test.py`
@@ -118,6 +134,5 @@ Run a test script.
 Compile and run web-app.
 
 `npm start`
-
 
 ***WARNING! This solution is intended for learning purposes only. It does not cover error checking and other edge cases. The smart contract(s) in this solution have NOT been audited. Therefore, it should not be used as a production application.***

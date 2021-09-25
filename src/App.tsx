@@ -30,7 +30,7 @@ function App() {
         </Col>
         <Col sm={9}>
           <Tabs defaultActiveKey="algoclient">
-            <Tab eventKey="algoclient" title="Algorand Server">
+            <Tab eventKey="algoclient" title="Node Provider">
               <TabBase>
                 <AlgorandClient/>
               </TabBase>

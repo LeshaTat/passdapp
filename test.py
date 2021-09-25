@@ -49,6 +49,12 @@ byPasswd = TransactionByPasswd(smart, lsigs, passwd)
 send_transaction(byPasswd.gen_cancel(), wait_for_next_round=True)
 byPasswd.reload()
 
+# IMPORTANT! Check if mark in ledger is correct
+if not byPasswd.check_mark_before_prepare():
+  sys.exit("Contract state check failed. For security reasons you have to do setup again.")
+else:
+  print("Contract state check passed.")
+
 # Generate confirmation transaction for each user
 tx_confirm = byPasswd.gen_tx_confirm()
 
@@ -63,7 +69,7 @@ mark = byPasswd.gen_mark(tx_confirm)
 print("Send prepare")
 pxt = send_transaction(byPasswd.gen_tx_prepare(mark))
 
-# IMPORTANT! Check if mark in ledger is correct
+# IMPORTANT(2)! Check if mark in ledger is correct
 if not byPasswd.check_mark_after_prepare(mark):
   sys.exit("Contract state check failed. For security reasons you have to do setup again.")
 else:

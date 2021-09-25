@@ -141,6 +141,12 @@ class TransactionByPasswd:
   def gen_mark(self, confirm_tx: transaction.LogicSigTransaction):
     return get_bytes_txid_raw(confirm_tx.transaction)
   
+  def check_mark_before_prepare(self):
+    self.smart.read_local_state()
+    print('Current mark:')
+    print(self.smart.get_local_state_bytes("mark"))
+    return self.smart.get_local_state_bytes("mark") == b""
+
   def check_mark_after_prepare(self, mark):
     self.smart.read_local_state()
     return self.smart.get_local_state_bytes("mark") == mark
