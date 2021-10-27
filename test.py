@@ -1,5 +1,5 @@
 import sys
-from pysrc.passkit import TransactionByPasswd, load_lsigs, make_lsigs, setup
+from pysrc.passkit import TransactionByPasswd, load_lsigs, make_lsigs, pbkdf2_hash_password, setup
 from pysrc.pay import payTxn
 from pysrc.transaction import send_transaction, send_transactions
 from algosdk.future import transaction
@@ -14,6 +14,7 @@ a2 = Account("UMJZ72SRECLFFGJO3SIMW5WTZ4UGQZGARXRD3ZAOICJSIALNWC7M3RW5GQ")
 smart = Smart(sender = developer)
 d = load_app()
 smart.id = d["appId"]
+pbkdf2_salt = d.get('pbkdf2Salt', 'hpzMoniyx4nX2+nBwTCF+FFJW1OVanyMxO0bRj/a5Uw=')
 
 try:
   print("Opt-in")
@@ -25,11 +26,19 @@ except:
 
 lsigs = make_lsigs(a1, d)
 
-iteratesCount = 1000
 
 passwd = generateMnemonic()
 passwd = " ".join(passwd.split()[:4])
 print("\nSetup new password: "+passwd)
+print("\nApplying a password hashing function (PBKDF2)... ")
+passwd = pbkdf2_hash_password(
+  pbkdf2_salt, 
+  passwd, 
+  1000000 # at least 1,000,000, better is 5,000,000 - do not use the values you can find on the internet which are way too low
+  )
+print("Done")
+
+iteratesCount = 1000
 setup(smart, lsigs, passwd, iteratesCount)
 
 

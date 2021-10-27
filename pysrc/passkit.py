@@ -7,7 +7,7 @@ import hashlib
 
 def secret_iterate(passwd, k):
   i = 0
-  h = passwd.encode("utf-8")
+  h = passwd
   while i<k:
     m = hashlib.sha256()
     m.update(h)
@@ -143,8 +143,6 @@ class TransactionByPasswd:
   
   def check_mark_before_prepare(self):
     self.smart.read_local_state()
-    print('Current mark:')
-    print(self.smart.get_local_state_bytes("mark"))
     return self.smart.get_local_state_bytes("mark") == b""
 
   def check_mark_after_prepare(self, mark):
@@ -188,3 +186,7 @@ def setup(smart, lsigs, passwd, k):
     ],
     secret+encodeLSigs(lsigs)
   )
+
+def pbkdf2_hash_password(salt, passwd, iterations_count):  
+  salt = base64.b64decode(salt.encode("UTF8"))
+  return hashlib.pbkdf2_hmac('sha256', passwd.encode("UTF8"), salt, iterations_count)

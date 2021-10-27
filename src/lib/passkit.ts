@@ -29,7 +29,7 @@ export function checkAuthRequest(mark: string, state: PassDAppConfirmState) {
   return mark==state.mark
 }
 
-export function checkPasswd(appId: number, passwd: string, state: PassDAppState): boolean {
+export function checkPasswd(appId: number, passwd: Uint8Array, state: PassDAppState): boolean {
   if( 
     state.status==="not-created" || 
     state.status==="not-opted-in" ||
@@ -132,3 +132,30 @@ export function makeSigs(account: algosdk.Account): Sigs {
   }
 }
 
+// At least 1,000,000, better is 5,000,000 - do not use the values you can find on the internet which are way too low
+const pbkdf2IterationsCount = 1000000
+
+export async function hashPasswd(passwd: string): Promise<Uint8Array> {
+  console.log("Applying a password hashing function (PBKDF2)... ")
+    
+  let hashed = new Uint8Array(await window.crypto.subtle.deriveBits(
+    {
+        name: "PBKDF2",
+        hash: "SHA-256",
+        salt: decode(dapp["pbkdf2Salt"] || 'hpzMoniyx4nX2+nBwTCF+FFJW1OVanyMxO0bRj/a5Uw='),
+        iterations: pbkdf2IterationsCount,
+    },
+    await window.crypto.subtle.importKey(
+      "raw",
+      Uint8Array.from(passwd, (c: string) => c.charCodeAt(0)), 
+      "PBKDF2", 
+      false,
+      ["deriveBits"]
+    ),
+    256
+  ))
+
+  console.log("Done")
+
+  return hashed
+}

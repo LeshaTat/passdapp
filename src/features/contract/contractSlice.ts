@@ -1,6 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { AppThunk, RootState } from '../../app/store'
-import { Sigs } from '../../lib/passkit'
+import { Sigs, hashPasswd } from '../../lib/passkit'
 import {appId} from "../../dapp.json"
 import { selectAccount } from "../account/accountSlice"
 import { selectAlgod } from "../algoclient/algoClientSlice"
@@ -64,11 +64,12 @@ export const requestSetupContract = (passwd: string): AppThunk => async (
   if( !dappState ) throw "App state is not loaded"
   if( dappState.status=="not-created" ) throw "App is not created"
   if( dappState.status=="not-opted-in" ) throw "App is not opted in"
+  const hashedPasswd = await hashPasswd(passwd)
   await setup(
     algod, 
     account, 
     appId, 
-    passwd
+    hashedPasswd
   )
 };
 

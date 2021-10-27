@@ -13,6 +13,7 @@ import {
   selectAvailableRequests,
   selectCurrentRequest,
   selectPasswd,
+  selectPasswdRaw,
   setPasswd
 } from './authSlice'
 import {
@@ -56,9 +57,9 @@ export function Auth() {
   const address = useAppSelector(selectAddress)
   const availableRequests = {...useAppSelector(selectAvailableRequests)}
   const currentRequest = useAppSelector(selectCurrentRequest)
-  const passwd = useAppSelector(selectPasswd)
+  const passwdRaw = useAppSelector(selectPasswdRaw)
 
-  const [curPasswd, setCurPasswd] = useState<string>(passwd)
+  const [curPasswd, setCurPasswd] = useState<string>(passwdRaw)
 
   const [raddr, setRAddr] = useState<string>("QC7XT7QU7X6IHNRJZBR67RBMKCAPH67PCSX4LYH4QKVSQ7DQZ32PG5HSVQ")
   const [amount, setAmount] = useState<number>(110000)
@@ -72,7 +73,7 @@ export function Auth() {
   const handleFind = useCallback(
     async () => {
       if( !curPasswd ) return
-      if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
+      if( curPasswd!=passwdRaw ) dispatch(setPasswd(curPasswd))
       try {
         await dispatch(makeRequest(requestLSigs()))
       } catch(e) {
@@ -86,7 +87,7 @@ export function Auth() {
     async () => {
       if( !raddr ) return
       try {
-        if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
+        if( curPasswd!=passwdRaw ) dispatch(setPasswd(curPasswd))
         const curTxn = await dispatch(makePaymentTxn(raddr, amount))
         setTxn(curTxn)
         setGroupCTxn(null)
@@ -105,7 +106,7 @@ export function Auth() {
 
   const handleConfirm = useCallback(
     async () => {
-      if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
+      if( curPasswd!=passwdRaw ) dispatch(setPasswd(curPasswd))
       if( !groupCTxn || !groupTxn ) return
       try {
         await dispatch(makeRequest(requestConfirm(groupCTxn, groupTxn)))
@@ -118,7 +119,7 @@ export function Auth() {
 
   const handleCancel = useCallback(
     async () => {
-      if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
+      if( curPasswd!=passwdRaw ) dispatch(setPasswd(curPasswd))
       if( !curPasswd ) return
       try {
         await dispatch(makeRequest(requestCancel()))
@@ -126,14 +127,14 @@ export function Auth() {
         handleError(e)
       }
     },
-    [passwd]
+    [passwdRaw]
   )
 
   const handleMake = useCallback(
     async () => {
       try {
         if( !curPasswd ) throw "Passwd is not set"
-        if( curPasswd!=passwd ) dispatch(setPasswd(curPasswd))
+        if( curPasswd!=passwdRaw ) dispatch(setPasswd(curPasswd))
         await dispatch(requestAuth(
           async () => {
             const curTxn = await dispatch(makePaymentTxn(raddr, amount))

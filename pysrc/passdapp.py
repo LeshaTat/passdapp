@@ -1,9 +1,11 @@
 import json
 import os
+import base64
 from pathlib import Path
 from algosdk.future import transaction
 from pyteal import Mod, Arg, Add, Minus, TealType, If, Gt, Ge, Seq, Assert, Txn, App, Bytes, Int, Btoi, Return, And, Or, OnComplete, Cond, compileTeal, Mode, Global, Gtxn, Sha256, ScratchVar
 from .config import algod_client
+from nacl.utils import random
 
 def approval_program():
     register = Seq([
@@ -151,12 +153,13 @@ def save_app(app_id, app):
     confirm_lsig_compiled = algod_client.compile(confirm_lsig_teal)
     confirm_txn_lsig_compiled = algod_client.compile(confirm_txn_lsig_teal)
     cancel_lsig_compiled = algod_client.compile(cancel_lsig_teal)
+    pbkdf2_salt = base64.b64encode(random(32)).decode('UTF8')
     save_teal(os.path.join(dir, "teal/approval"), app["approval_program"])
     save_teal(os.path.join(dir, "teal/clear"), app["clear_program"])
     save_teal(os.path.join(dir, "teal/prepare"), prepare_lsig_teal)
     save_teal(os.path.join(dir, "teal/confirm"), confirm_lsig_teal)
     save_teal(os.path.join(dir, "teal/confirmTxn"), confirm_txn_lsig_teal)
-    save_teal(os.path.join(dir, "teal/cancel"), cancel_lsig_teal)
+    save_teal(os.path.join(dir, "teal/cancel"), cancel_lsig_teal)    
     with open(os.path.join(dir, "src/dapp.json"), 'w') as f:
         f.write(json.dumps({
             "appId": app_id,
@@ -164,6 +167,7 @@ def save_app(app_id, app):
             "confirm": confirm_lsig_compiled["result"],
             "confirmTxn": confirm_txn_lsig_compiled["result"],
             "cancel": cancel_lsig_compiled["result"],
+            "pbkdf2Salt": pbkdf2_salt
         }, indent=4))
 
 def load_app():

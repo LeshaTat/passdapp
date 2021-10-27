@@ -76,7 +76,7 @@ export async function setup(
   algod: algosdk.Algodv2, 
   account: algosdk.Account, 
   appId: number, 
-  passwd: string
+  passwd: Uint8Array
 ) {
   const suggestedParams = await algod.getTransactionParams().do();
   let {
@@ -115,7 +115,7 @@ export async function setup(
 export async function findCredentials(
   indexer: algosdk.Indexer, 
   appId: number, 
-  passwd: string
+  passwd: Uint8Array
 ): Promise<{address: string, sigs: Sigs}> {
   let notePrefix = makeHashIterate(passwd, iteratesCount)
   let search = await indexer.searchForTransactions()

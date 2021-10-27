@@ -12,18 +12,21 @@ import { selectAlgod, selectIndexer } from "../algoclient/algoClientSlice"
 import { selectSigs, setSigs } from "../contract/contractSlice"
 import { makeRequest, selectDAppState } from "../status/statusSlice"
 import { appId } from "../../dapp.json"
+import { hashPasswd } from "../../lib/passkit"
 import { cancel, confirmCTxn, findCredentials, makeConfirmTxn, prepare } from "../../lib/passreq"
 import { encode, makeHashIterate } from "../../lib/utils"
 
 export type RequestType = "find" | "prepare" | "confirm" | "cancel"
 
 export interface Auth { 
-  passwd: string,
+  passwdRaw: string,
+  passwdHashed: Uint8Array | null,
   currentRequest: RequestType | null;
 }
 
 const initialState: Auth = {
-  passwd: "",
+  passwdRaw: "",
+  passwdHashed: null,
   currentRequest: null
 }
 
@@ -32,7 +35,10 @@ export const authSlice = createSlice({
   initialState,
   reducers: {
     setPasswd: (state, action: PayloadAction<string>) => {
-      state.passwd = action.payload
+      if( state.passwdRaw != action.payload ) {
+        state.passwdHashed = null
+      }
+      state.passwdRaw = action.payload
     },
     setCurrentRequest: (state, action: PayloadAction<RequestType | null>) => {
       state.currentRequest = action.payload
@@ -43,7 +49,17 @@ export const authSlice = createSlice({
 export const { setPasswd, setCurrentRequest } = authSlice.actions
 
 export const selectCurrentRequest = (state: RootState) => state.auth.currentRequest
-export const selectPasswd = (state: RootState) => state.auth.passwd
+export const selectPasswdRaw = (state: RootState) => state.auth.passwdRaw
+
+let memorizedPasswdRaw: string = ""
+let memorizedPasswdHash: Uint8Array | null = null
+export const selectPasswd = async (state: RootState) => {
+  if( !memorizedPasswdHash || state.auth.passwdRaw != memorizedPasswdRaw ) {
+    memorizedPasswdHash = await hashPasswd(state.auth.passwdRaw)
+    memorizedPasswdRaw = state.auth.passwdRaw
+  }
+  return memorizedPasswdHash
+}
 
 export type AvailableRequests = {[K in RequestType]?: boolean}
 
@@ -64,9 +80,9 @@ export const selectAvailableRequests = createSelector(
 export const selectPasswdCheck = createSelector(
   selectDAppState,
   selectPasswd,
-  (dappState, passwd): boolean => {
+  async (dappState, passwd): Promise<boolean> => {
     if( !dappState ) return false
-    return checkPasswd(appId, passwd, dappState)
+    return checkPasswd(appId, await passwd, dappState)
   }
 )
 
@@ -99,7 +115,7 @@ AppThunk<Promise<{groupCTxn: algosdk.Transaction, groupTxn: algosdk.Transaction}
   const algod = selectAlgod(getState())
   const sigs = selectSigs(getState())
   const dappState = selectDAppState(getState())
-  const passwd = selectPasswd(getState())
+  const passwd = await selectPasswd(getState())
   if( !sigs ) throw "Credentials were not set"
   if( !dappState || dappState.status!="wait-prepare" ) throw "Incorrect contract local state"
   dispatch(setCurrentRequest('prepare'))
@@ -171,7 +187,7 @@ export const requestCancel = (): AppThunk => async (
   const algod = selectAlgod(getState())
   const sigs = selectSigs(getState())
   const dappState = selectDAppState(getState())
-  const passwd = selectPasswd(getState())
+  const passwd = await selectPasswd(getState())
   if( !sigs ) throw "Signatures not loaded"
   if( !dappState || dappState.status!=="wait-confirm" ) throw "Not waiting for confirmation"
   dispatch(setCurrentRequest("cancel"))
@@ -193,7 +209,7 @@ export const requestLSigs = (): AppThunk => async (
   getState
 ) => {
   const indexer: algosdk.Indexer = selectIndexer(getState())
-  const passwd = selectPasswd(getState())
+  const passwd = await selectPasswd(getState())
   dispatch(setCurrentRequest("find"))
   try {
     const {address, sigs} =  await findCredentials(
@@ -216,7 +232,9 @@ export const requestAuth = (
   getState
 ) => {
   const sigs = selectSigs(getState())
-  if( !sigs || !selectPasswdCheck(getState()) ) {
+  const passwd = await selectPasswd(getState())
+  const dappState = selectDAppState(getState())
+  if( !dappState || !sigs || !checkPasswd(appId, passwd, dappState)) {
     await dispatch(makeRequest(requestLSigs()))
   }
   const address = selectAddress(getState())
