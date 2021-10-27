@@ -54,7 +54,7 @@ You can find PyTeal specifications for contract and logic signatures in the file
 
 ### Setup
 
-1. Generate 44-bits password randomly. The user gets it as an 4-words passphrase where each word is chosen randomly from the [list](https://git.io/fhZUO) of 2048 words.
+1. Generate 44-bits password randomly. The user gets it as an 4-words passphrase where each word is chosen randomly from the [list](https://git.io/fhZUO) of 2048 words. Then, apply a password hashing function (we use PBKDF2 with sha256 and 1000000 iterations) to increase the difficulty of the dictionary attack.
 
 2. Opt-in to PassDApp smart contract.
 
